@@ -1,0 +1,54 @@
+# QA Automation Pipeline
+# Focus: Build → Test → Publish QA Evidence (Reports, Logs, Coverage)
+
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  mavenOptions: '-Xmx3072m'
+
+stages:
+- stage: QAValidation
+  jobs:
+  - job: RunTests
+    steps:
+    - checkout: self
+      clean: true
+
+    # Build & run tests
+    - task: Maven@3
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'clean test'
+        options: '$(mavenOptions)'
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '1.11'   # ✅ must be literal
+        jdkArchitectureOption: 'x64'
+        publishJUnitResults: true
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+
+    # Publish test reports (JUnit/Surefire)
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: 'target/surefire-reports'
+        ArtifactName: 'TestReports'
+        publishLocation: 'Container'
+
+    # Publish logs/screenshots if generated
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: 'target/logs'
+        ArtifactName: 'ExecutionLogs'
+        publishLocation: 'Container'
+
+    # Publish coverage reports (JaCoCo)
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: 'target/site/jacoco'
+        ArtifactName: 'CoverageReports'
+        publishLocation: 'Container'
