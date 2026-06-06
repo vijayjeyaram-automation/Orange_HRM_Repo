@@ -1,0 +1,79 @@
+# QA Automation Pipeline
+# Focus: Build → Test → Publish QA Evidence (Reports, Logs, Coverage)
+
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  mavenOptions: '-Xmx3072m'
+
+stages:
+# Stage 1: Build
+- stage: Build
+  jobs:
+  - job: Compile
+    steps:
+    - checkout: self
+      clean: true
+    - task: Maven@3
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'clean compile'
+        options: '$(mavenOptions)'
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '1.11'
+        jdkArchitectureOption: 'x64'
+
+# Stage 2: Unit Tests
+- stage: UnitTests
+  jobs:
+  - job: RunUnitTests
+    steps:
+    - task: Maven@3
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'test'
+        options: '$(mavenOptions)'
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '1.11'
+        jdkArchitectureOption: 'x64'
+        publishJUnitResults: true
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+
+# Stage 3: Reports
+- stage: Reports
+  jobs:
+  - job: PublishReports
+    steps:
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: 'target/surefire-reports'
+        ArtifactName: 'TestReports'
+        publishLocation: 'Container'
+
+# Stage 4: Logs
+- stage: Logs
+  jobs:
+  - job: PublishLogs
+    steps:
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: 'target/logs'
+        ArtifactName: 'ExecutionLogs'
+        publishLocation: 'Container'
+
+# Stage 5: Coverage
+- stage: Coverage
+  jobs:
+  - job: PublishCoverage
+    steps:
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: 'target/site/jacoco'
+        ArtifactName: 'CoverageReports'
+        publishLocation: 'Container'
